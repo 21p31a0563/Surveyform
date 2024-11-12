@@ -281,8 +281,6 @@
             document.getElementById("review-section").style.display = "none";
             document.getElementById("success-message").style.display = "block";
         });
-
-        // Enhanced PDF Download functionality
         document.getElementById("downloadPdf").addEventListener("click", function() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -312,9 +310,7 @@
                 "Professional Information": responses.slice(8)
             };
             
-            // Iterate through sections
             Object.entries(sections).forEach(([sectionTitle, sectionResponses]) => {
-                // Check if we need a new page for the section
                 if (yPos > pageHeight - 50) {
                     doc.addPage();
                     yPos = margin;
@@ -325,39 +321,26 @@
                 doc.setFont("helvetica", "bold");
                 doc.text(sectionTitle, margin, yPos);
                 yPos += lineHeight * 1.5;
-                
-                // Add section content
                 doc.setFontSize(12);
                 doc.setFont("helvetica", "normal");
                 
                 sectionResponses.forEach(response => {
-                    // Check if we need a new page
                     if (yPos > pageHeight - 30) {
                         doc.addPage();
                         yPos = margin;
                     }
-                    
-                    // Format each response
                     const text = ${response.question}: ${response.answer};
-                    
-                    // Split long text into multiple lines
                     const textLines = doc.splitTextToSize(text, doc.internal.pageSize.width - 2 * margin);
-                    
-                    // Add each line
                     textLines.forEach(line => {
                         doc.text(line, margin, yPos);
                         yPos += lineHeight;
                     });
                     
-                    // Add some spacing between responses
                     yPos += lineHeight * 0.5;
                 });
                 
-                // Add spacing between sections
                 yPos += lineHeight;
             });
-            
-            // Add footer with page numbers
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
