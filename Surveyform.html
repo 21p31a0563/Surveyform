@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Survey Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .survey-container {
+            width: 70%;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .question {
+            margin-bottom: 20px;
+        }
+        .question label {
+            font-size: 18px;
+        }
+        .question input[type="radio"],
+        .question input[type="checkbox"] {
+            margin-right: 10px;
+        }
+        .question input[type="text"], 
+        .question input[type="email"], 
+        .question input[type="tel"],
+        .question input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 20px;
+            color: red;
+        }
+        .btn {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        #review-section, #success-message {
+            display: none;
+        }
+        #startSurvey {
+            display: block;
+        }
+        #learn-more {
+            color: #007BFF;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="survey-container">
+        <h1>Employee Survey Form</h1>
+        <div id="timer">Time Remaining: 30:00</div>
+        <div id="questionnaire">
+            <!-- Dynamic Questions will be added here -->
+        </div>
+        <button id="startSurvey" class="btn">Start Survey</button>
+    </div>
+
+    <div id="review-section">
+        <h2>Review Your Responses</h2>
+        <div id="review-content"></div>
+        <input type="checkbox" id="finalSubmitCheckbox"> Yes, I wish to go for final submission.
+        <button id="finalSubmit" class="btn" disabled>Submit</button>
+    </div>
+
+    <div id="success-message">
+        <h2>Thanks for submitting the form!</h2>
+        <button id="downloadPdf" class="btn">Download PDF</button>
+        <p>For more information, <span id="learn-more">click here</span> to learn more.</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        let timerInterval;
+        let timeRemaining = 30 * 60; // 30 minutes in seconds
+        let currentSection = 0;
+        let responses = [];
+
+        // Questions and Sections Setup
+        const sections = [
+            [
+                { question: "Full Name", type: "text", required: true },
+                { question: "Email Address", type: "email", required: true },
+                { question: "Phone Number", type: "tel", required: true },
+                { question: "Gender", type: "radio", options: ["Male", "Female", "Other"], required: true },
+                { question: "Date of Birth", type: "date", required: true }
+            ],
+            [
+                { question: "Highest Qualification", type: "text", required: true },
+                { question: "Institution", type: "text", required: true },
+                { question: "Year of Graduation", type: "text", required: true, validation: /^\d{4}$/ }
+            ],
+            [
+                { question: "Current Job Title", type: "text", required: true },
+                { question: "Company Name", type: "text", required: true },
+                { question: "Years of Experience", type: "text", required: true, validation: /^[0-9]+$/ },
+                { question: "Job Satisfaction (1-5)", type: "radio", options: ["1", "2", "3", "4", "5"], required: true }
+            ]
+        ];
+
+        // Start the survey
+        document.getElementById("startSurvey").addEventListener("click", function() {
+            startSurvey();
+        });
+
+        function startSurvey() {
+            currentSection = 0;
+            responses = [];
+            document.getElementById("startSurvey").style.display = "none";
+            displayQuestions();
+            startTimer();
+        }
+
+        function displayQuestions() {
+            const section = sections[currentSection];
+            const questionnaireDiv = document.getElementById("questionnaire");
+            questionnaireDiv.innerHTML = "";
+
+            section.forEach((q, index) => {
+                const div = document.createElement("div");
+                div.classList.add("question");
+                const label = document.createElement("label");
+                label.textContent = q.question;
+                div.appendChild(label);
+
+                if (q.type === "radio" || q.type === "checkbox") {
+                    q.options.forEach(option => {
+                        const input = document.createElement("input");
+                        input.type = q.type;
+                        input.name = q.question;
+                        input.value = option;
+                        const label = document.createElement("label");
+                        label.textContent = option;
+                        div.appendChild(input);
+                        div.appendChild(label);
+                    });
+                } else {
+                    const input = document.createElement("input");
+                    input.type = q.type;
+                    input.name = q.question;
+                    input.required = q.required;
+                    div.appendChild(input);
+                }
+
+                questionnaireDiv.appendChild(div);
+            });
+
+            const buttonContainer = document.createElement("div");
+            const nextButton = document.createElement("button");
+            nextButton.textContent = "Next Section";
+            nextButton.classList.add("btn");
+            nextButton.addEventListener("click", function() {
+                if (validateSection()) {
+                    collectResponses();
+                    if (currentSection < sections.length - 1) {
+                        currentSection++;
+                        displayQuestions();
+                    } else {
+                        showReview();
+                    }
+                } else {
+                    alert("Please fill all the fields correctly.");
+                }
+            });
+
+            const prevButton = document.createElement("button");
+            prevButton.textContent = "Previous Section";
+            prevButton.classList.add("btn");
+            prevButton.style.marginRight = "10px";
+            prevButton.addEventListener("click", function() {
+                if (currentSection > 0) {
+                    currentSection--;
+                    displayQuestions();
+                }
+            });
+
+            buttonContainer.appendChild(prevButton);
+            buttonContainer.appendChild(nextButton);
+            questionnaireDiv.appendChild(buttonContainer);
+        }
+
+        function validateSection() {
+            const section = sections[currentSection];
+            let valid = true;
+
+            section.forEach(q => {
+                const inputs = document.getElementsByName(q.question);
+                if (q.type === "text" || q.type === "email" || q.type === "tel") {
+                    const input = inputs[0];
+                    if (!input.value) {
+                        valid = false;
+                    } else if (q.type === "email" && !validateEmail(input.value)) {
+                        valid = false;
+                    } else if (q.type === "tel" && !validatePhone(input.value)) {
+                        valid = false;
+                    } else if (q.type === "text" && q.validation && !q.validation.test(input.value)) {
+                        valid = false;
+                    }
+                } else if (q.type === "radio") {
+                    let radioChecked = false;
+                    inputs.forEach(input => {
+                        if (input.checked) radioChecked = true;
+                    });
+                    if (!radioChecked) valid = false;
+                } else if (q.type === "date") {
+                    const input = inputs[0];
+                    if (!input.value) valid = false;
+                }
+            });
+
+            return valid;
+        }
+
+        function validateEmail(email) {
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            return emailPattern.test(email);
+        }
+
+        function validatePhone(phone) {
+            const phonePattern = /^[0-9]{10}$/;
+            return phonePattern.test(phone);
+        }
+
+        function collectResponses() {
+            const section = sections[currentSection];
+            section.forEach(q => {
+                const inputs = document.getElementsByName(q.question);
+                inputs.forEach(input => {
+                    if ((input.type === "radio" && input.checked) || (input.type !== "radio" && input.value)) {
+                        responses.push({ question: q.question, answer: input.value });
+                    }
+                });
+            });
+        }
+
+        function showReview() {
+            document.getElementById("questionnaire").style.display = "none";
+            const reviewContent = document.getElementById("review-content");
+            reviewContent.innerHTML = "";
+
+            responses.forEach(r => {
+                reviewContent.innerHTML += <p>${r.question}: ${r.answer}</p>;
+            });
+
+            document.getElementById("review-section").style.display = "block";
+        }
+
+        document.getElementById("finalSubmitCheckbox").addEventListener("change", function() {
+            const submitButton = document.getElementById("finalSubmit");
+            submitButton.disabled = !this.checked;
+        });
+
+        document.getElementById("finalSubmit").addEventListener("click", function() {
+            alert("Form submitted successfully!");
+            document.getElementById("review-section").style.display = "none";
+            document.getElementById("success-message").style.display = "block";
+        });
+
+        // Enhanced PDF Download functionality
+        document.getElementById("downloadPdf").addEventListener("click", function() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Set initial coordinates
+            let yPos = 20;
+            const pageHeight = doc.internal.pageSize.height;
+            const margin = 20;
+            const lineHeight = 10;
+            
+            // Add header
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            doc.text("Employee Survey Report", margin, yPos);
+            yPos += lineHeight * 2;
+            
+            // Add date
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(Generated on: ${new Date().toLocaleDateString()}, margin, yPos);
+            yPos += lineHeight * 2;
+            
+            // Group responses by section
+            const sections = {
+                "Personal Information": responses.slice(0, 5),
+                "Educational Background": responses.slice(5, 8),
+                "Professional Information": responses.slice(8)
+            };
+            
+            // Iterate through sections
+            Object.entries(sections).forEach(([sectionTitle, sectionResponses]) => {
+                // Check if we need a new page for the section
+                if (yPos > pageHeight - 50) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+                
+                // Add section header
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text(sectionTitle, margin, yPos);
+                yPos += lineHeight * 1.5;
+                
+                // Add section content
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "normal");
+                
+                sectionResponses.forEach(response => {
+                    // Check if we need a new page
+                    if (yPos > pageHeight - 30) {
+                        doc.addPage();
+                        yPos = margin;
+                    }
+                    
+                    // Format each response
+                    const text = ${response.question}: ${response.answer};
+                    
+                    // Split long text into multiple lines
+                    const textLines = doc.splitTextToSize(text, doc.internal.pageSize.width - 2 * margin);
+                    
+                    // Add each line
+                    textLines.forEach(line => {
+                        doc.text(line, margin, yPos);
+                        yPos += lineHeight;
+                    });
+                    
+                    // Add some spacing between responses
+                    yPos += lineHeight * 0.5;
+                });
+                
+                // Add spacing between sections
+                yPos += lineHeight;
+            });
+            
+            // Add footer with page numbers
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.text(Page ${i} of ${pageCount}, doc.internal.pageSize.width / 2, 
+                         doc.internal.pageSize.height - 10, { align: 'center' });
+            }
+            
+            // Save the PDF
+            doc.save("Survey_Report.pdf");
+        });
+
+        // Learn More link
+        document.getElementById("learn-more").addEventListener("click", function() {
+            window.open("https://www.youtube.com", "_blank");
+        });
+
+        // Timer
+        function startTimer() {
+            timerInterval = setInterval(function() {
+                let minutes = Math.floor(timeRemaining / 60);
+                let seconds = timeRemaining % 60;
+                document.getElementById("timer").textContent = Time Remaining: ${minutes}:${seconds < 10 ? '0' + seconds : seconds};
+
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    alert("Time's up! Submitting the form now.");
+                    showReview();
+                }
+
+                timeRemaining--;
+            }, 1000);
+        }
+    </script>
+
+</body>
+</html>
